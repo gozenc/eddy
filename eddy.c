@@ -11,8 +11,7 @@
 #define CTRL_KEY(k) ((k) & 0x1f)
 
 struct editorConfig {
-	int screenrows;
-  int screencols;
+	int cx, cy, screenrows, screencols;
 	struct termios orig_termios;
 };
 
@@ -160,7 +159,10 @@ void editorRefreshScreen(void) {
 
 	editorDrawRows(&ab);
 
-	abufAppend(&ab, "\x1b[H", 3);
+  char buf[32];
+  snprintf(buf, sizeof(buf), "\x1b[%d;%dH", E.cy + 1, E.cx + 1);
+  abufAppend(&ab, buf, strlen(buf));
+
 	abufAppend(&ab, "\x1b[?25h", 6);
 
 	write(STDOUT_FILENO, ab.buffer, ab.len);
@@ -168,6 +170,23 @@ void editorRefreshScreen(void) {
 }
 
 /* INPUT */
+void editorMoveCursor(char key) {
+  switch (key) {
+    case 'a':
+      E.cx--;
+      break;
+    case 'd':
+      E.cx++;
+      break;
+    case 'w':
+      E.cy--;
+      break;
+    case 's':
+      E.cy++;
+      break;
+  }
+}
+
 void editorProcessKeyPress(void) {
 	char c = editorReadKey();
 	
@@ -176,12 +195,21 @@ void editorProcessKeyPress(void) {
 			clearScreen();
 			exit(0);
 			break;
+
+    case 'w':
+    case 'a':
+    case 's':
+    case 'd':
+      editorMoveCursor(c);
+      break;
 	}
 
 }
 
 /* INIT */
 void initEditor(void) {
+  E.cx = 0;
+  E.cy = 0;
 	if ( getWindowSize(&E.screenrows, &E.screencols) == -1 ) {
 		die("getWindowSize");
 	}
