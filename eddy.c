@@ -2,10 +2,12 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
 
+#define EDDY_VERSION "0.0.1"
 #define CTRL_KEY(k) ((k) & 0x1f)
 
 struct editorConfig {
@@ -95,18 +97,74 @@ int getWindowSize(int *rows, int *cols) {
 	}
 }
 
+/* APPEND BUFFER */
+struct abuf {
+	char *buffer;
+	int len;
+};
+
+#define ABUF_INIT {NULL, 0}
+
+void abufAppend( struct abuf *ab, const char *s, int len ) {
+	char *new = realloc( ab->buffer, ab->len + len );
+
+	if ( new == NULL ) return;
+	memcpy( &new[ab->len], s, len );
+	ab->buffer = new;
+	ab->len += len;
+}
+
+void abufFree( struct abuf *ab ) {
+	free(ab->buffer);
+}
+
 /* OUTPUT */
-void editorDrawRows(void) {
+void editorDrawRows(struct abuf *ab) {
 	int y;
 	for (y = 0; y < E.screenrows; y++) {
-		write(STDOUT_FILENO, "~\r\n", 3);
+
+		if ( y == E.screenrows / 3 ) {
+			char welcome[80];
+			int welcomelen = snprintf(
+				welcome, sizeof(welcome),
+				"EDDY Text Editor - v%s", EDDY_VERSION
+			);
+			if ( welcomelen > E.screencols ) {
+				welcomelen = E.screencols;
+			}
+
+			int padding = (E.screencols - welcomelen) / 2;
+			if ( padding ) {
+				abufAppend(ab, "~", 1);
+				padding--;
+			}
+			while (padding--) abufAppend(ab, " ", 1);
+
+			abufAppend(ab, welcome, welcomelen);
+		} else {
+			abufAppend(ab, "~", 1);
+		}
+
+		abufAppend(ab, "\x1b[K", 3);
+		if ( y < E.screenrows - 1 ) {
+			abufAppend(ab, "\r\n", 2);
+		}
 	}
 }
 
 void editorRefreshScreen(void) {
-	clearScreen();
-	editorDrawRows();
-	write(STDOUT_FILENO, "\x1b[H", 3);
+	struct abuf ab = ABUF_INIT;
+
+	abufAppend(&ab, "\x1b[?25l", 6);
+	abufAppend(&ab, "\x1b[H", 3);
+
+	editorDrawRows(&ab);
+
+	abufAppend(&ab, "\x1b[H", 3);
+	abufAppend(&ab, "\x1b[?25h", 6);
+
+	write(STDOUT_FILENO, ab.buffer, ab.len);
+	abufFree(&ab);
 }
 
 /* INPUT */
