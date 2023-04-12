@@ -22,8 +22,14 @@ enum editorKey {
   PAGE_DOWN,
 };
 
+typedef struct erow {
+	int size;
+	char *chars;
+} erow;
+
 struct editorConfig {
-	int cx, cy, screenrows, screencols;
+	int cx, cy, screenrows, screencols, numrows;
+	erow row;
 	struct termios orig_termios;
 };
 
@@ -287,6 +293,8 @@ void editorProcessKeyPress(void) {
 void initEditor(void) {
   E.cx = 0;
   E.cy = 0;
+	E.numrows = 0;
+
 	if ( getWindowSize(&E.screenrows, &E.screencols) == -1 ) {
 		die("getWindowSize");
 	}
