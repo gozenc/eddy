@@ -200,7 +200,7 @@ void editorDrawRows(struct abuf *ab) {
 			char welcome[80];
 			int welcomelen = snprintf(
 				welcome, sizeof(welcome),
-				"EDDY Text Editor - v%s", EDDY_VERSION
+				"EDDY Text Editor v%s", EDDY_VERSION
 			);
 			if ( welcomelen > E.screencols ) {
 				welcomelen = E.screencols;
